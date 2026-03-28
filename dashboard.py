@@ -1,92 +1,108 @@
 import streamlit as st
 import pandas as pd
+from datetime import date
 
-st.title("Dashboard Penjualan")
+st.set_page_config(layout="wide")
 
-# =========================
-# UPLOAD FILE
-# =========================
-uploaded_file = st.file_uploader("Upload File Excel", type=["xlsx"])
+st.title("Dashboard Monitoring NPR & PUR")
 
-if uploaded_file is not None:
-    data = pd.read_excel(uploaded_file)
-else:
-    data = pd.read_excel("Penjualan.xlsx")
+tab1, tab2 = st.tabs(["NPR", "PUR"])
 
-# =========================
-# FILTER TANGGAL
-# =========================
-data["Tanggal"] = pd.to_datetime(data["Tanggal"])
+# =============================
+# TAB NPR
+# =============================
+with tab1:
+    st.header("Dashboard NPR")
 
-start_date = st.date_input("Tanggal Awal", data["Tanggal"].min())
-end_date = st.date_input("Tanggal Akhir", data["Tanggal"].max())
+    df_npr = pd.read_excel("data_npr.xlsx")
+    df_npr.columns = df_npr.columns.str.strip()
 
-# filter data sesuai tanggal
-filtered_data = data[
-    (data["Tanggal"] >= pd.to_datetime(start_date)) &
-    (data["Tanggal"] <= pd.to_datetime(end_date))
-]
+    df_npr["Tanggal Complete"] = pd.to_datetime(df_npr["Tanggal Complete"], errors="coerce")
 
-# =========================
-# HITUNG TOTAL
-# =========================
-filtered_data["Total"] = filtered_data["Qty"] * filtered_data["Harga"]
+    today = date.today()
 
-# =========================
-# SCORECARD
-# =========================
-total_omzet = filtered_data["Total"].sum()
-total_barang = filtered_data["Qty"].sum()
-total_transaksi = len(filtered_data)
-total_produk = filtered_data["Nama Barang"].nunique()
+    nama_list = df_npr["Penanggung Jawab"].dropna().unique().tolist()
+    nama = st.selectbox("Filter Penanggung Jawab NPR", ["Semua"] + sorted(nama_list))
 
-col1, col2, col3, col4 = st.columns(4)
+    if nama != "Semua":
+        df_npr = df_npr[df_npr["Penanggung Jawab"] == nama]
 
-col1.metric("Total Omzet", f"Rp {total_omzet:,.0f}")
-col2.metric("Total Barang Terjual", total_barang)
-col3.metric("Total Transaksi", total_transaksi)
-col4.metric("Jumlah Produk", total_produk)
+    total_npr = len(df_npr)
+    total_complete = len(df_npr[df_npr["Status"] == "Complete"])
 
-st.divider()
+    selesai_hari_ini = df_npr[
+        (df_npr["Status"] == "Complete") &
+        (df_npr["Tanggal Complete"].dt.date == today)
+    ]
 
-# =========================
-# TABEL
-# =========================
-st.subheader("Database Penjualan")
-st.dataframe(filtered_data)
+    total_today = len(selesai_hari_ini)
 
-st.divider()
+    col1, col2, col3 = st.columns(3)
 
-# =========================
-# CHART 1: Penjualan per Produk
-# =========================
-st.subheader("Penjualan per Produk")
-penjualan_produk = filtered_data.groupby("Nama Barang")["Qty"].sum().sort_values(ascending=False)
-st.bar_chart(penjualan_produk)
+    col1.metric("Total NPR", total_npr)
+    col2.metric("Total NPR Complete", total_complete)
+    col3.metric("Selesai Hari Ini", total_today)
 
-# =========================
-# CHART 2: Omzet per Produk
-# =========================
-st.subheader("Omzet per Produk")
-omzet_produk = filtered_data.groupby("Nama Barang")["Total"].sum().sort_values(ascending=False)
-st.bar_chart(omzet_produk)
+    st.divider()
 
-# =========================
-# CHART 3: Omzet per Tanggal
-# =========================
-st.subheader("Omzet per Tanggal")
-penjualan_tanggal = filtered_data.groupby("Tanggal")["Total"].sum()
-st.line_chart(penjualan_tanggal)
+    st.subheader("Data NPR selesai hari ini")
 
-# =========================
-# TOP 5 PRODUK TERLARIS
-# =========================
-st.subheader("Top 5 Produk Terlaris")
-top_produk = penjualan_produk.head(5)
-st.table(top_produk)
+    if total_today > 0:
+        st.error(f"Ada {total_today} NPR selesai hari ini")
+        st.dataframe(selesai_hari_ini)
+    else:
+        st.success("Tidak ada NPR selesai hari ini")
 
-# =========================
-# INSIGHT OTOMATIS
-# =========================
-produk_terlaris = penjualan_produk.idxmax()
-st.success(f"🔥 Produk Terlaris: {produk_terlaris}")
+    st.divider()
+    st.subheader("Semua Data NPR")
+    st.dataframe(df_npr)
+
+
+# =============================
+# TAB PUR
+# =============================
+with tab2:
+    st.header("Dashboard PUR")
+
+    df_pur = pd.read_excel("data_pur.xlsx")
+    df_pur.columns = df_pur.columns.str.strip()
+
+    df_pur["Tanggal Complete"] = pd.to_datetime(df_pur["Tanggal Complete"], errors="coerce")
+
+    today = date.today()
+
+    nama_list_pur = df_pur["Penanggung Jawab"].dropna().unique().tolist()
+    nama_pur = st.selectbox("Filter Penanggung Jawab PUR", ["Semua"] + sorted(nama_list_pur))
+
+    if nama_pur != "Semua":
+        df_pur = df_pur[df_pur["Penanggung Jawab"] == nama_pur]
+
+    total_pur = len(df_pur)
+    total_complete_pur = len(df_pur[df_pur["Status"] == "Complete"])
+
+    pur_today = df_pur[
+        (df_pur["Status"] == "Complete") &
+        (df_pur["Tanggal Complete"].dt.date == today)
+    ]
+
+    total_today_pur = len(pur_today)
+
+    col1, col2, col3 = st.columns(3)
+
+    col1.metric("Total PUR", total_pur)
+    col2.metric("Total PUR Complete", total_complete_pur)
+    col3.metric("Selesai Hari Ini", total_today_pur)
+
+    st.divider()
+
+    st.subheader("Data PUR selesai hari ini")
+
+    if total_today_pur > 0:
+        st.error(f"Ada {total_today_pur} PUR selesai hari ini")
+        st.dataframe(pur_today)
+    else:
+        st.success("Tidak ada PUR selesai hari ini")
+
+    st.divider()
+    st.subheader("Semua Data PUR")
+    st.dataframe(df_pur)
